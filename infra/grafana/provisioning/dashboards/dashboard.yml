@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: bearing-monitor
+    folder: Bearing Monitor
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
+
