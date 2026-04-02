@@ -111,8 +111,8 @@ export default function App() {
       setDiscoveredProducts(result.products);
       setStatusMessage(
         result.products.length
-          ? `Found ${result.products.length} bearing candidates for "${result.query}".`
-          : `No matching bearing products were found for "${result.query}".`,
+          ? `Found ${result.products.length} products for "${result.query}".`
+          : `No products found for "${result.query}".`,
       );
     },
   });
@@ -187,11 +187,11 @@ export default function App() {
   return (
     <main className="shell">
       <section className="hero">
-        <p className="eyebrow">Amazon India Bearing Tracker</p>
-        <h1>Discover SKF/model candidates, then monitor a watchlist.</h1>
+        <p className="eyebrow">Amazon India Price Monitor</p>
+        <h1>Track any Amazon product and monitor competitor pricing.</h1>
         <p className="intro">
-          Search Amazon for bearing queries, filter candidates by brand and model, add the right
-          ASINs to the watchlist, and inspect the current seller stack and Buy Box per buyer location.
+          Paste any Amazon product URL to start tracking, search for products by query,
+          add ASINs to the watchlist, and inspect the current seller stack and Buy Box per buyer location.
         </p>
       </section>
 
@@ -203,7 +203,7 @@ export default function App() {
               id="discover-query"
               value={discoverQueryInput}
               onChange={(event) => setDiscoverQueryInput(event.target.value)}
-              placeholder="SKF bearing [model]"
+              placeholder="e.g. SKF bearing 6205, iPhone 15, boAt headphones"
             />
           </div>
           <div className="field">
@@ -212,7 +212,7 @@ export default function App() {
               id="brand-filter"
               value={brandFilterInput}
               onChange={(event) => setBrandFilterInput(event.target.value)}
-              placeholder="Brand filter, e.g. SKF"
+              placeholder="Optional brand filter"
             />
           </div>
           <div className="field">
@@ -221,7 +221,7 @@ export default function App() {
               id="model-filter"
               value={modelFilterInput}
               onChange={(event) => setModelFilterInput(event.target.value)}
-              placeholder="Model filter, e.g. 6205"
+              placeholder="Optional model filter"
             />
           </div>
           <div className="field">
@@ -262,7 +262,7 @@ export default function App() {
               discoverMutation.mutate();
             }}
           >
-            {discoverMutation.isPending ? "Discovering..." : "Discover Candidates"}
+            {discoverMutation.isPending ? "Discovering..." : "Discover Products"}
           </button>
           <button
             type="button"
@@ -275,7 +275,7 @@ export default function App() {
           >
             {trackMutation.isPending ? "Fetching..." : "Track Product URL"}
           </button>
-          <span className="helper-text">Scheduler will only monitor watchlist ASINs.</span>
+          <span className="helper-text">Scheduler monitors all watchlist ASINs automatically.</span>
         </div>
 
         {actionBusy ? <div className="message info">{statusMessage}</div> : null}
@@ -287,7 +287,7 @@ export default function App() {
         <article className="list-card">
           <div className="section-head">
             <h3>Discovery results</h3>
-            <span>{trackedCandidates.length} candidates</span>
+            <span>{trackedCandidates.length} products</span>
           </div>
           <div className="tracked-list">
             {trackedCandidates.length ? (
@@ -328,7 +328,7 @@ export default function App() {
                 </div>
               ))
             ) : (
-              <div className="empty-mini">Run a filtered discovery query to populate candidate ASINs.</div>
+              <div className="empty-mini">Run a search query to discover products, or paste a URL directly.</div>
             )}
           </div>
         </article>
@@ -377,7 +377,7 @@ export default function App() {
                 </div>
               ))
             ) : (
-              <div className="empty-mini">No tracked ASINs yet. Add the right candidates to start monitoring.</div>
+              <div className="empty-mini">No tracked ASINs yet. Paste a product URL or search to start monitoring.</div>
             )}
           </div>
         </article>

@@ -170,7 +170,7 @@ async def list_products(session: AsyncSession, limit: int = 50, search: str | No
             "available_locations": row["available_locations"],
         }
         for row in products
-        if validate_product(row["title"], row["brand"], row["query"]).is_bearing
+        if validate_product(row["title"], row["brand"], row["query"]).is_valid
     ]
     return filtered_products[:limit]
 
@@ -244,7 +244,7 @@ async def list_products_for_query(
             "available_locations": row["available_locations"],
         }
         for row in products
-        if validate_product(row["title"], row["brand"], row["query"]).is_bearing
+        if validate_product(row["title"], row["brand"], row["query"]).is_valid
     ]
     return filtered_products[:limit]
 

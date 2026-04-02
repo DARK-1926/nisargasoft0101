@@ -58,6 +58,8 @@ def validate_product(title: str | None, brand: str | None = None, query: str | N
     if normalized_title in INVALID_TITLE_MARKERS:
         return ProductValidation(is_valid=False, is_bearing=False, reason="invalid_title")
 
+    # Any product with a valid title is accepted — bearing classification is kept for
+    # backwards-compatible callers but no longer used as a gate.
     if any(keyword in normalized_title for keyword in BEARING_KEYWORDS):
         return ProductValidation(is_valid=True, is_bearing=True)
 
@@ -65,25 +67,13 @@ def validate_product(title: str | None, brand: str | None = None, query: str | N
         return ProductValidation(is_valid=True, is_bearing=True)
 
     bearing_series_tokens = (
-        "620",
-        "621",
-        "622",
-        "623",
-        "624",
-        "625",
-        "626",
-        "627",
-        "628",
-        "629",
-        "630",
-        "631",
-        "632",
-        "633",
-        "634",
+        "620", "621", "622", "623", "624", "625", "626", "627", "628", "629",
+        "630", "631", "632", "633", "634",
     )
     if "bearing" in normalized_query and any(token in normalized_title for token in bearing_series_tokens):
         return ProductValidation(is_valid=True, is_bearing=True)
 
+    # Non-bearing product — still valid, just not classified as a bearing.
     return ProductValidation(is_valid=True, is_bearing=False, reason="not_bearing")
 
 

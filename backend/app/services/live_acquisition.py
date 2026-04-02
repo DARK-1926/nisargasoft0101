@@ -183,7 +183,8 @@ async def discover_search_products(
                 title = card["title"] or asin or ""
                 if not asin or asin in seen:
                     continue
-                if not validate_product(title, None, query).is_bearing:
+                validation = validate_product(title, None, query)
+                if not validation.is_valid:
                     continue
                 seen[asin] = DiscoveryCandidate(
                     asin=asin,
