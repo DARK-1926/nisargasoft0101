@@ -36,6 +36,7 @@ from backend.app.services.live_acquisition import (
     discover_search_products,
     resolve_amazon_asin,
     run_asin_scrape,
+    run_asin_scrape_all_locations,
 )
 from backend.app.services.market_data import (
     get_product_summary,
@@ -63,6 +64,8 @@ async def metrics():
 
 @router.get("/api/locations", response_model=list[LocationProfileOut])
 async def locations() -> list[LocationProfileOut]:
+    # Return all known location profiles, not just the configured defaults.
+    from backend.app.location_profiles import LOCATION_PROFILES
     return [
         LocationProfileOut(
             code=profile.code,
@@ -70,7 +73,7 @@ async def locations() -> list[LocationProfileOut]:
             state=profile.state,
             pin_code=profile.pin_code,
         )
-        for profile in resolve_locations(settings.default_locations)
+        for profile in LOCATION_PROFILES.values()
     ]
 
 
@@ -101,9 +104,8 @@ async def create_watchlist_item(
     if await session.get(Product, payload.asin) is None:
         api_base_url = str(request.base_url).rstrip("/")
         try:
-            await run_asin_scrape(
+            await run_asin_scrape_all_locations(
                 asin=payload.asin,
-                location_code=payload.location_code,
                 api_base_url=api_base_url,
                 title_hint=payload.source_query,
             )
@@ -260,9 +262,8 @@ async def track_url(
 
     api_base_url = str(request.base_url).rstrip("/")
     try:
-        await run_asin_scrape(
+        await run_asin_scrape_all_locations(
             asin=asin,
-            location_code=payload.location_code,
             api_base_url=api_base_url,
             title_hint=payload.title_hint,
         )
@@ -288,12 +289,15 @@ async def track_url(
 @router.post("/api/discover", response_model=DiscoverProductsOut)
 async def discover_products(
     payload: DiscoverProductsIn,
+    request: Request,
 ) -> DiscoverProductsOut:
+    api_base_url = str(request.base_url).rstrip("/")
     try:
         products = await discover_search_products(
             query=payload.query,
             location_code=payload.location_code,
             max_pages=payload.max_pages,
+            api_base_url=api_base_url,
         )
     except LiveAcquisitionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

@@ -1,17 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
 
 import {
   addWatchlistItem,
   ApiError,
   discoverProducts,
+  getAlerts,
   getCurrent,
+  getHistory,
   getLocations,
   getWatchlist,
   removeWatchlistItem,
   trackAmazonUrl,
 } from "./api";
-import type { CurrentAsin, LocationProfile, ProductSummary, WatchlistItem } from "./types";
+import { useStream } from "./hooks/useStream";
+import type { AlertEvent, CurrentAsin, LocationProfile, ProductSummary, WatchlistItem } from "./types";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 function formatPrice(value: number | null | undefined) {
   if (value === null || value === undefined) {
@@ -66,6 +82,35 @@ export default function App() {
     queryFn: () => getCurrent(selectedAsin, selectedLocation),
     enabled: Boolean(selectedAsin && selectedLocation),
     refetchInterval: 60_000,
+  });
+
+  const historyQuery = useQuery({
+    queryKey: ["history", selectedAsin, selectedLocation],
+    queryFn: () => getHistory(selectedAsin, selectedLocation, 168),
+    enabled: Boolean(selectedAsin && selectedLocation),
+    refetchInterval: 120_000,
+  });
+
+  const alertsQuery = useQuery({
+    queryKey: ["alerts"],
+    queryFn: getAlerts,
+    refetchInterval: 60_000,
+  });
+
+  useStream((event) => {
+    try {
+      const data = JSON.parse(event.data) as { asin?: string; location_code?: string };
+      if (event.type === "snapshot.updated") {
+        void queryClient.invalidateQueries({ queryKey: ["current", data.asin, data.location_code] });
+        void queryClient.invalidateQueries({ queryKey: ["history", data.asin, data.location_code] });
+        void queryClient.invalidateQueries({ queryKey: ["watchlist"] });
+      }
+      if (event.type === "alert.created") {
+        void queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      }
+    } catch {
+      // ignore malformed SSE payloads
+    }
   });
 
   useEffect(() => {
@@ -175,6 +220,40 @@ export default function App() {
 
   const currentProductInWatchlist = selectedAsin ? watchlistKeys.has(`${selectedAsin}:${selectedLocation}`) : false;
   const currentError = currentQuery.error instanceof ApiError ? currentQuery.error.message : null;
+
+  const CHART_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#8b5cf6"];
+
+  // Only show the chart when there are at least 2 distinct timestamps — a single
+  // data point produces a flat line that gives no useful information.
+  const chartData = useMemo(() => {
+    const series = historyQuery.data?.series ?? [];
+    if (!series.length) return null;
+    const allTimestamps = Array.from(
+      new Set(series.flatMap((s) => s.points.map((p) => p.captured_at as string)))
+    ).sort();
+    if (allTimestamps.length < 2) return null;
+    return {
+      labels: allTimestamps.map((ts) =>
+        new Intl.DateTimeFormat("en-IN", { dateStyle: "short", timeStyle: "short" }).format(new Date(ts))
+      ),
+      datasets: series.map((s, i) => ({
+        label: s.seller_name,
+        data: allTimestamps.map((ts) => {
+          const pt = s.points.find((p) => (p.captured_at as string) === ts);
+          return pt ? pt.price : null;
+        }),
+        borderColor: CHART_COLORS[i % CHART_COLORS.length],
+        backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + "33",
+        tension: 0.3,
+        spanGaps: true,
+      })),
+    };
+  }, [historyQuery.data]);
+
+  const recentAlerts: AlertEvent[] = useMemo(() => {
+    const all = alertsQuery.data ?? [];
+    return all.filter((a) => !selectedAsin || a.asin === selectedAsin).slice(0, 10);
+  }, [alertsQuery.data, selectedAsin]);
   const trackedCandidates = useMemo(
     () =>
       discoveredProducts.map((product) => ({
@@ -466,6 +545,81 @@ export default function App() {
               ))}
             </div>
           </article>
+
+          {chartData ? (
+            <article className="offers-card">
+              <div className="section-head">
+                <h3>Price history</h3>
+                <span>last 7 days</span>
+              </div>
+              <div style={{ padding: "1rem 0" }}>
+                <Line
+                  data={chartData}
+                  options={{
+                    responsive: true,
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                      legend: { position: "bottom" },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) =>
+                            `${ctx.dataset.label}: ${ctx.parsed.y != null ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(ctx.parsed.y) : "—"}`,
+                        },
+                      },
+                    },
+                    scales: {
+                      y: {
+                        ticks: {
+                          callback: (v) =>
+                            new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(v)),
+                        },
+                      },
+                      x: { ticks: { maxTicksLimit: 8 } },
+                    },
+                  }}
+                />
+              </div>
+            </article>
+          ) : (
+            <article className="offers-card">
+              <div className="section-head">
+                <h3>Price history</h3>
+                <span>building up</span>
+              </div>
+              <div className="empty-mini" style={{ padding: "1.5rem 1rem" }}>
+                <p style={{ margin: 0 }}>
+                  Only one snapshot captured so far — history builds automatically as the scheduler
+                  runs every {20} minutes. Add this ASIN to the watchlist to keep it monitored.
+                </p>
+              </div>
+            </article>
+          )}
+
+          {recentAlerts.length > 0 ? (
+            <article className="offers-card">
+              <div className="section-head">
+                <h3>Price alerts</h3>
+                <span>{recentAlerts.length} recent</span>
+              </div>
+              <div className="offer-list">
+                {recentAlerts.map((alert) => (
+                  <div key={alert.id} className="offer-row" style={{ alignItems: "flex-start" }}>
+                    <div className="offer-main">
+                      <div className="offer-title-row">
+                        <strong>{alert.competitor_seller_name}</strong>
+                        <span className="pill" style={{ background: "#fee2e2", color: "#b91c1c" }}>undercut</span>
+                      </div>
+                      <p style={{ fontSize: "0.85rem", color: "var(--text-muted, #6b7280)" }}>{alert.message}</p>
+                      <small>{formatTimestamp(alert.created_at)}</small>
+                    </div>
+                    <div className="offer-price" style={{ color: "#ef4444" }}>
+                      {formatPrice(alert.competitor_price)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ) : null}
         </section>
       ) : (
         <section className="empty-panel">

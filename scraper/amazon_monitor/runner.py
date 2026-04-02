@@ -92,14 +92,24 @@ def main() -> None:
             artifact_dir=args.artifact_dir,
         )
     else:
+        # Load watchlist targets and expand to all known locations so every
+        # ASIN is scraped for each geography on every scheduled run.
+        from backend.app.location_profiles import LOCATION_PROFILES
+
         targets = load_watchlist_targets()
+        seen_asins: set[str] = set()
         for target in targets:
-            process.crawl(
-                AmazonBearingsSpider,
-                asin=target["asin"],
-                location_code=target["location_code"],
-                artifact_dir=args.artifact_dir,
-            )
+            asin = target["asin"]
+            if asin in seen_asins:
+                continue
+            seen_asins.add(asin)
+            for location_code in LOCATION_PROFILES:
+                process.crawl(
+                    AmazonBearingsSpider,
+                    asin=asin,
+                    location_code=location_code,
+                    artifact_dir=args.artifact_dir,
+                )
 
     process.start()
 
