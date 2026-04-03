@@ -493,7 +493,7 @@ class AmazonBearingsSpider(scrapy.Spider):
     async def scroll_to_load_all_offers(self, page) -> None:
         """Scroll the offer listing page to load all dynamically loaded sellers."""
         previous_offer_count = 0
-        max_scrolls = 10
+        max_scrolls = 30  # Increased to ensure all sellers are loaded (was 10)
         scroll_attempts = 0
 
         while scroll_attempts < max_scrolls:
