@@ -60,7 +60,7 @@ class Offer(Base):
     list_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     shipping_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(8), default="INR")
-    availability: Mapped[str | None] = mapped_column(String(128))
+    availability: Mapped[str | None] = mapped_column(Text)
     fba_status: Mapped[bool] = mapped_column(Boolean, default=False)
     buy_box_flag: Mapped[bool] = mapped_column(Boolean, default=False)
     is_prime: Mapped[bool] = mapped_column(Boolean, default=False)
