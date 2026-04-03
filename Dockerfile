@@ -34,14 +34,17 @@ RUN python -m pip install --no-cache-dir \
     "uvicorn[standard]>=0.30.1" \
     "python-slugify>=8.0.4"
 
-FROM api-base AS backend
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
 FROM api-base AS crawler-base
 RUN python -m pip install --no-cache-dir \
     "Scrapy>=2.11.0" \
     "scrapy-playwright>=0.0.35" \
     "playwright>=1.45.0"
+
+# Install playwright browsers for API container (needed for live scraping)
+RUN playwright install --with-deps chromium
+
+FROM crawler-base AS backend
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 FROM crawler-base AS worker
 ENV ENABLE_WORKER_METRICS=1
@@ -51,5 +54,4 @@ FROM crawler-base AS beat
 CMD ["celery", "-A", "backend.app.celery_app.celery_app", "beat", "--loglevel=info"]
 
 FROM crawler-base AS scraper
-RUN playwright install --with-deps chromium
 CMD ["python", "-m", "scraper.amazon_monitor.runner", "monitor"]
