@@ -262,10 +262,13 @@ async def track_url(
 
     api_base_url = str(request.base_url).rstrip("/")
     try:
-        await run_asin_scrape_all_locations(
+        # Only scrape the requested location to avoid timeout (scraping all locations takes 12+ minutes)
+        await run_asin_scrape(
             asin=asin,
+            location_code=payload.location_code,
             api_base_url=api_base_url,
             title_hint=payload.title_hint,
+            timeout_seconds=900,  # 15 minutes to handle slow scrapes
         )
     except LiveAcquisitionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
