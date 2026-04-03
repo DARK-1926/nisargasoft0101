@@ -235,6 +235,8 @@ async def _run_scraper_command(
     env["INGEST_API_URL"] = api_base_url.rstrip("/")
     env.setdefault("SCRAPER_ARTIFACT_DIR", "artifacts/scraper_failures")
     env.setdefault("PYTHONIOENCODING", "utf-8")
+    # CRITICAL: Scrapy-Playwright requires asyncio reactor
+    env["TWISTED_REACTOR"] = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
     process = await asyncio.create_subprocess_exec(
         *command,
