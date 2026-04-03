@@ -14,12 +14,20 @@ logger = structlog.get_logger(__name__)
 
 @celery_app.task(name="bearing_monitor.run_watchlist")
 def run_watchlist() -> dict[str, int | str]:
+    import os
     started_at = time.perf_counter()
+
+    # Pass INGEST_API_URL explicitly so the subprocess can reach the API
+    # regardless of whether it's running in Docker or locally.
+    env = os.environ.copy()
+    env.setdefault("INGEST_API_URL", "http://localhost:8000")
+
     result = subprocess.run(
         [sys.executable, "-m", "scraper.amazon_monitor.runner", "monitor"],
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
     duration = time.perf_counter() - started_at
     proxy_failures = result.stdout.count("proxy_failure") + result.stderr.count("proxy_failure")

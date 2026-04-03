@@ -316,6 +316,7 @@ class AmazonBearingsSpider(scrapy.Spider):
             offers_response = await self.goto_with_retries(offers_page, offers_url)
             await self.ensure_location(offers_page)
             await self.wait_for_offer_page_ready(offers_page)
+            await self.scroll_to_load_all_offers(offers_page)
             offers_html = await self.safe_page_content(offers_page)
             offers_selector = scrapy.Selector(text=offers_html)
             offers_status = offers_response.status if offers_response is not None else None
@@ -488,6 +489,50 @@ class AmazonBearingsSpider(scrapy.Spider):
                 return
             except Exception:  # noqa: BLE001
                 continue
+
+    async def scroll_to_load_all_offers(self, page) -> None:
+        """Scroll the offer listing page to load all dynamically loaded sellers."""
+        previous_offer_count = 0
+        max_scrolls = 10
+        scroll_attempts = 0
+
+        while scroll_attempts < max_scrolls:
+            # Count current offers in DOM
+            current_offer_count = await page.locator(
+                "#aod-pinned-offer, #aod-offer, div.aod-offer"
+            ).count()
+
+            # If no new offers appeared, we're done
+            if current_offer_count == previous_offer_count and scroll_attempts > 0:
+                break
+
+            previous_offer_count = current_offer_count
+
+            # Scroll to bottom of page
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(1_500)
+
+            # Check for "Show more" button and click if present
+            show_more = page.locator(
+                "a[data-action='show-more'], "
+                ".a-pagination .a-last a, "
+                "#aod-show-more-offers"
+            )
+            if await show_more.count() > 0:
+                try:
+                    await show_more.first.click(timeout=2_000)
+                    await page.wait_for_timeout(2_000)
+                except Exception:  # noqa: BLE001
+                    pass
+
+            scroll_attempts += 1
+
+        self.logger.info(
+            "scroll_complete asin=%s offers_loaded=%s scrolls=%s",
+            self.target_asin or "unknown",
+            previous_offer_count,
+            scroll_attempts,
+        )
 
     async def safe_page_content(self, page) -> str:
         last_error: Exception | None = None

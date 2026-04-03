@@ -2,6 +2,30 @@
 
 This repository contains a deployable MVP for monitoring bearing prices on Amazon India. It is designed for distributors tracking identical ASINs across multiple sellers, watching Buy Box ownership by buyer location, and reacting to significant price drops.
 
+## 🚀 Quick Start
+
+**One command to start everything:**
+
+```bash
+LAUNCH.bat
+```
+
+That's it! The system will automatically:
+- Install all dependencies
+- Start Redis (via Docker if available)
+- Start API, scheduler, and frontend
+- Open your browser to the dashboard
+
+**See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.**
+
+## ✨ What's New
+
+Recent fixes include:
+- ✅ **Automatic scheduler** - Scrapes watchlist every 10 minutes
+- ✅ **Complete seller capture** - Scrolls to load all sellers from Amazon
+- ✅ **All 5 locations available** - Chennai, Mumbai, Bengaluru, Delhi, Hyderabad
+- ✅ **Automatic Redis setup** - Starts in Docker if available
+
 ## What is included
 
 - `backend`: FastAPI API, PostgreSQL/TimescaleDB models, alert evaluation, SSE stream, Prometheus metrics, Slack/email notifications.

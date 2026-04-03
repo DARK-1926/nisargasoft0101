@@ -6,7 +6,7 @@ from decimal import Decimal
 from statistics import mean
 
 from slugify import slugify
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.metrics import OFFERS_INGESTED
@@ -250,24 +250,38 @@ async def list_products_for_query(
 
 
 async def get_current_snapshot(session: AsyncSession, asin: str, location_code: str) -> dict:
-    latest_offers = (
-        select(Offer.seller_id, func.max(Offer.captured_at).label("captured_at"))
+    # Find the single most recent captured_at across all sellers for this
+    # ASIN+location. All offers from that scrape run share the same timestamp
+    # because the spider sets captured_at once per ingest call.
+    latest_ts_row = await session.execute(
+        select(func.max(Offer.captured_at))
         .where(Offer.asin == asin, Offer.buyer_location_code == location_code)
-        .group_by(Offer.seller_id)
-        .subquery()
     )
+    latest_ts = latest_ts_row.scalar_one_or_none()
+
+    if latest_ts is None:
+        return {
+            "asin": asin,
+            "title": asin,
+            "location_code": location_code,
+            "captured_at": None,
+            "buy_box_offer": None,
+            "offers": [],
+        }
+
+    # Allow a 5-second window around the latest timestamp to catch any offers
+    # that were written in the same scrape run but committed a moment later.
+    window_start = latest_ts - timedelta(seconds=5)
+
     stmt = (
         select(Offer, Seller.name, Product.title)
-        .join(
-            latest_offers,
-            and_(
-                Offer.seller_id == latest_offers.c.seller_id,
-                Offer.captured_at == latest_offers.c.captured_at,
-            ),
-        )
         .join(Seller, Seller.seller_id == Offer.seller_id)
         .join(Product, Product.asin == Offer.asin)
-        .where(Offer.asin == asin, Offer.buyer_location_code == location_code)
+        .where(
+            Offer.asin == asin,
+            Offer.buyer_location_code == location_code,
+            Offer.captured_at >= window_start,
+        )
         .order_by(Offer.price.asc())
     )
     rows = (await session.execute(stmt)).all()
@@ -276,7 +290,12 @@ async def get_current_snapshot(session: AsyncSession, asin: str, location_code: 
     title = rows[0][2] if rows else asin
     latest_captured_at = None
 
-    for offer, seller_name, _ in rows:
+    # Deduplicate: keep only the most recent offer per seller within the window.
+    seen_sellers: set[str] = set()
+    for offer, seller_name, _ in sorted(rows, key=lambda r: r[0].captured_at, reverse=True):
+        if offer.seller_id in seen_sellers:
+            continue
+        seen_sellers.add(offer.seller_id)
         latest_captured_at = max(latest_captured_at, offer.captured_at) if latest_captured_at else offer.captured_at
         offers.append(
             {
@@ -294,7 +313,9 @@ async def get_current_snapshot(session: AsyncSession, asin: str, location_code: 
             }
         )
 
-    buy_box_offer = next((offer for offer in offers if offer["buy_box_flag"]), offers[0] if offers else None)
+    # Re-sort by price ascending after dedup.
+    offers.sort(key=lambda o: o["price"])
+    buy_box_offer = next((o for o in offers if o["buy_box_flag"]), offers[0] if offers else None)
     return {
         "asin": asin,
         "title": title,

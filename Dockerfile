@@ -11,11 +11,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+COPY pyproject.toml ./
 COPY backend ./backend
 COPY scraper ./scraper
 
 FROM python-base AS api-base
 RUN python -m pip install --no-cache-dir \
+    "aiosqlite>=0.20.0" \
     "asyncpg>=0.29.0" \
     "celery[redis]>=5.4.0" \
     "fastapi>=0.115.0" \

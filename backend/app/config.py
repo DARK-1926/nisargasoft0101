@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     own_seller_names_raw: str = Field(default="", alias="OWN_SELLER_NAMES")
     rotating_proxies_raw: str = Field(default="", alias="ROTATING_PROXIES")
     price_drop_threshold: float = 0.10
-    scrape_interval_minutes: int = 20
+    scrape_interval_minutes: int = 5
     slack_webhook_url: str | None = None
     alert_email_from: str | None = None
     alert_email_to: str | None = None
