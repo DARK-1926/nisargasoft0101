@@ -192,7 +192,6 @@ class HybridAmazonScraper:
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_argument('--disable-gpu')
         options.add_argument('--disable-images')  # Faster loading
-        options.add_argument('--disable-javascript')  # Not needed for static content
         options.add_argument('--window-size=1920,1080')
         
         # Anti-detection
@@ -204,7 +203,8 @@ class HybridAmazonScraper:
         }
         options.add_experimental_option('prefs', prefs)
         
-        self.driver = uc.Chrome(options=options, version_main=120)
+        # Let undetected-chromedriver auto-detect Chrome version
+        self.driver = uc.Chrome(options=options, use_subprocess=True)
     
     def _smart_scroll(self):
         """Optimized scrolling - only scroll until no new content."""
