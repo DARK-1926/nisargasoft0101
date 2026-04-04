@@ -9,11 +9,13 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import undetected_chromedriver as uc
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 @dataclass
@@ -181,30 +183,31 @@ class HybridAmazonScraper:
         return offers
     
     def _init_driver(self):
-        """Initialize undetected Chrome with optimizations."""
-        options = uc.ChromeOptions()
+        """Initialize Chrome with webdriver-manager for automatic version matching."""
+        options = Options()
         if self.headless:
             options.add_argument('--headless=new')
         
-        # Performance optimizations
+        # Performance and anti-detection
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_argument('--disable-gpu')
-        options.add_argument('--disable-images')  # Faster loading
         options.add_argument('--window-size=1920,1080')
-        
-        # Anti-detection
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
+        # Disable images for speed
         prefs = {
-            'profile.managed_default_content_settings.images': 2,  # Disable images
+            'profile.managed_default_content_settings.images': 2,
             'profile.default_content_setting_values.notifications': 2,
         }
         options.add_experimental_option('prefs', prefs)
+        options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        options.add_experimental_option('useAutomationExtension', False)
         
-        # Let undetected-chromedriver auto-detect Chrome version
-        self.driver = uc.Chrome(options=options, use_subprocess=True)
+        # Use webdriver-manager to auto-download matching ChromeDriver
+        service = Service(ChromeDriverManager().install())
+        self.driver = webdriver.Chrome(service=service, options=options)
     
     def _smart_scroll(self):
         """Optimized scrolling - only scroll until no new content."""
