@@ -11,7 +11,6 @@ from urllib.parse import parse_qs, unquote, urlparse
 import httpx
 
 from backend.app.services.product_filters import validate_product
-from scraper.amazon_monitor.spiders.amazon_bearings import AmazonBearingsSpider
 
 
 ASIN_RE = re.compile(r"\b([A-Z0-9]{10})\b", re.IGNORECASE)
