@@ -38,6 +38,7 @@ from backend.app.services.live_acquisition import (
     run_asin_scrape,
     run_asin_scrape_all_locations,
 )
+from backend.app.services.selenium_acquisition import hybrid_scrape_and_ingest
 from backend.app.services.market_data import (
     get_product_summary,
     get_current_snapshot,
@@ -262,15 +263,13 @@ async def track_url(
 
     api_base_url = str(request.base_url).rstrip("/")
     try:
-        # Only scrape the requested location to avoid timeout (scraping all locations takes 12+ minutes)
-        await run_asin_scrape(
+        # Use hybrid scraper (fast + accurate)
+        await hybrid_scrape_and_ingest(
             asin=asin,
             location_code=payload.location_code,
             api_base_url=api_base_url,
-            title_hint=payload.title_hint,
-            timeout_seconds=900,  # 15 minutes to handle slow scrapes
         )
-    except LiveAcquisitionError as exc:
+    except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     snapshot = await get_current_snapshot(session, asin=asin, location_code=payload.location_code)
